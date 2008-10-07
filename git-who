@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# original code by Petr "Pasky" Baudis ( pasky@suse.cz )
+# Scriptified, and expanded upon by masukomi ( masukomi@masukomi.org )
+if [ $# -lt 1 ]; then
+	echo 1>&2 Usage: git-who \<filepath\> \[ -v \]
+	exit 1
+fi
+if [ $# -eq 2 ] && [ "$2" = -v ]; then
+	git log --follow --pretty=format:%an --no-merges -r --name-only $1 |
+	perl -lne 'our %data;  $_ or $a = 0 or next; ++$a == 1 and $b = $_ and next;
+	$data{$_} = [] if (! defined $data{$_}); push @{$data{$_}}, $b; 
+	END { print  "$_: " . join(", ", @{$data{$_}}) for (keys %data);}'
+
+
+else 
+	git log --follow --pretty=format:%an --no-merges -r --name-only $1 |
+	perl -lne 'our %i; $_ or $a = 0 or next; ++$a == 1 and $b = $_ and next;
+	$i{$_}{$b}++; END { print "$_: " . join(", ", keys %{$i{$_}}) for (keys
+	%i); }'
+fi
