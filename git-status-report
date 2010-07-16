@@ -10,7 +10,7 @@ optparse = OptionParser.new do | opts |
 	opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. Defaults to your \"git config user.email\" address.") do |email|
 		options[:email] = email
 	end
-	opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to 7") do | days |
+	opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
 		options[:days] = days
 	end
 	opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
@@ -34,7 +34,7 @@ if (not options[:email])
 	end
 end
 if (not options[:days])
-	options[:days] = 7
+	options[:days] = 6
 end
 
 lines = `git log --pretty=format:"%ae||%s||%ci" --since="#{options[:days]} days ago"`
