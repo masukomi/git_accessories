@@ -13,6 +13,9 @@ optparse = OptionParser.new do | opts |
 	opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to 7") do | days |
 		options[:days] = days
 	end
+	opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
+		options[:simple] = true
+	end
 end
 
 begin 
@@ -55,7 +58,7 @@ end
 puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
 if (response_days.length > 0)
 	response_days.each do | date |
-		puts date
+		puts date if not options[:simple]
 		responses_by_day[date].each do | commit | 
 			puts "\t* #{commit}"
 		end
