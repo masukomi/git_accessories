@@ -1,0 +1,66 @@
+#!/usr/bin/ruby -W0
+
+require 'optparse'
+
+
+options = {}
+
+optparse = OptionParser.new do | opts |
+	opts.banner = "Usage: git status-report [-e <email>][-d <days>]\nGenerates a status report for what you worked on for the past n days."
+	opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. Defaults to your \"git config user.email\" address.") do |email|
+		options[:email] = email
+	end
+	opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to 7") do | days |
+		options[:days] = days
+	end
+end
+
+begin 
+	optparse.parse!
+rescue OptionParser::InvalidOption => e
+	puts e
+	puts optparse
+	exit 1
+end
+if (not options[:email])
+	options[:email] = `git config user.email`.chomp
+	if (not options[:email])
+		puts "You haven't configured an e-mail address for git. Please do so or specify one."
+		puts optparse
+		exit 1
+	end
+end
+if (not options[:days])
+	options[:days] = 7
+end
+
+lines = `git log --pretty=format:"%ae||%s||%ci" --since="#{options[:days]} days ago"`
+response_days = []
+responses_by_day = {}
+lines.each do | line |
+	if (line =~ /#{options[:email]}/i )  
+		components = line.split(/\|\|/)
+		date = components[2].chomp
+		date.sub!(/(\S+).*/, '\1')
+		if (not responses_by_day[date])
+			responses_by_day[date] = []
+			response_days.push(date)
+		end
+#		
+#		# email, title, relative date
+		responses_by_day[date].push(components[1])
+	end
+end
+
+puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
+if (response_days.length > 0)
+	response_days.each do | date |
+		puts date
+		responses_by_day[date].each do | commit | 
+			puts "\t* #{commit}"
+		end
+	end
+else
+	puts "No commits found for #{options[:email]}"
+end
+
