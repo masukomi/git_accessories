@@ -16,6 +16,9 @@ optparse = OptionParser.new do | opts |
 	opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
 		options[:simple] = true
 	end
+	opts.on("-s", "--verbose", "Verbose output includes details on each commit") do
+		options[:verbose] = true
+	end
 end
 
 begin 
@@ -37,13 +40,13 @@ if (not options[:days])
 	options[:days] = 6
 end
 
-lines = `git log --pretty=format:"%ae||%s||%ci" --since="#{options[:days]} days ago"`
+lines = `git log --pretty=format:"%ae||%s||%ci||%h" --since="#{options[:days]} days ago"`
 response_days = []
 responses_by_day = {}
 lines.each do | line |
 	if (line =~ /#{options[:email]}/i )  
 		components = line.split(/\|\|/)
-		date = components[2].chomp
+		date = components[2]
 		date.sub!(/(\S+).*/, '\1')
 		if (not responses_by_day[date])
 			responses_by_day[date] = []
@@ -51,16 +54,42 @@ lines.each do | line |
 		end
 #		
 #		# email, title, relative date
-		responses_by_day[date].push(components[1])
+		if (not options[:verbose])
+			responses_by_day[date].push(components[1])
+		else 
+			hash=components[3].chomp
+			raw_details = `git log --pretty=format:"%s%n%n%b" #{hash} -1`.chomp
+			response_details = ''
+			
+			raw_details.split(/\n/).each do | dl |
+				if (response_details)
+					response_details += "\t\t#{dl}\n"
+				else 
+					response_details = dl
+				end
+			end
+			responses_by_day[date].push(response_details)
+		end
 	end
 end
 
 puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
 if (response_days.length > 0)
 	response_days.each do | date |
+		
 		puts date if not options[:simple]
+		count = (responses_by_day[date].length > 1) ? responses_by_day[date].length : ''
 		responses_by_day[date].each do | commit | 
-			puts "\t* #{commit}"
+			if (not options[:verbose])
+				puts "\t* #{commit}"
+			else
+				if (count != '')
+					puts "\tcommit #{count}----------\n#{commit}"
+					count -= 1
+				else 
+					puts commit
+				end
+			end
 		end
 	end
 else
