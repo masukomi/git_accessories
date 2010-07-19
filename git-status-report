@@ -74,6 +74,16 @@ lines.each do | line |
 end
 
 puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
+if (options[:verbose])
+	branches = `git branch --no-color`
+	current_branch = nil
+	branches.each do |bn|
+		if (bn and bn =~ /\* (.*)/)
+			current_branch = $1
+		end
+	end
+	puts "  - Generated from \"#{current_branch}\" branch."
+end
 if (response_days.length > 0)
 	response_days.each do | date |
 		
