@@ -80,6 +80,7 @@ if (options[:verbose])
 	branches.each do |bn|
 		if (bn and bn =~ /\* (.*)/)
 			current_branch = $1
+			break
 		end
 	end
 	puts "  - Generated from \"#{current_branch}\" branch."
