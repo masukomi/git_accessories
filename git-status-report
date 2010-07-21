@@ -16,7 +16,7 @@ optparse = OptionParser.new do | opts |
 	opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
 		options[:simple] = true
 	end
-	opts.on("-s", "--verbose", "Verbose output includes details on each commit") do
+	opts.on("-v", "--verbose", "Verbose output includes details on each commit") do
 		options[:verbose] = true
 	end
 end
