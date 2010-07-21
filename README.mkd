@@ -1,0 +1,26 @@
+A tiny little repo of tiny little helper scripts for git.
+
+*git-who*
+
+`Usage: git-who <filepath> [-v]`
+
+Passing it just a file path will give you an unordered list of the people who have worked on it. Ex.:
+   foo.sh: Bob Smith, Mary Smith, Tom Jones
+
+Adding -v lists out the names of the people who have touched it, in order. Ex.: 
+
+   foo.sh: Bob Smith, Mary Smith, Bob Smith, Tom Jones, Bob Smith
+
+*git-status-report*
+
+Generates a status report for what you (or a coworker) worked on for the past n days. 
+Useful for those once a week emails your boss is always asking for.
+
+`Usage: git status-report [-e <email>][-d <days>]
+	-e, --email <email address>      The email address of the committer to generate a report for. Defaults to your "git config user.email" address.
+	-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
+	-s, --simple                     Simpler output. Doesn't include the dates
+	-v, --verbose                    Verbose output includes details on each commit`
+
+
+
