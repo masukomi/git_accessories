@@ -19,6 +19,9 @@ optparse = OptionParser.new do | opts |
 	opts.on("-v", "--verbose", "Verbose output includes details on each commit") do
 		options[:verbose] = true
 	end
+	opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
+		options[:reverse] = true
+	end
 end
 
 begin 
@@ -138,11 +141,22 @@ if (options[:verbose])
 end
 if (response_days.length > 0)
 	response_days.sort!
+	if (options[:reverse])
+		response_days.reverse!
+	end
 	response_days.each do | date |
 		
 		puts date if not options[:simple]
-		count = (responses_by_day[date].length > 1) ? 1 : ''
+		count = nil
+		if (not options[:reverse])
+			count = (responses_by_day[date].length > 1) ? 1 : ''
+		else 
+			count = (responses_by_day[date].length > 1) ? responses_by_day[date].length : ''
+		end
 		epoch_commit_times = responses_by_day[date].keys.sort
+		if (options[:reverse])
+			epoch_commit_times.reverse!
+		end
 		epoch_commit_times.each do |epoch|
 			commit = responses_by_day[date][epoch]
 			if (not options[:verbose])
@@ -151,7 +165,7 @@ if (response_days.length > 0)
 				if (count != '')
 					puts "\tcommit #{count}----------"
 					puts commit['details']
-					count = count +1
+					count = options[:reverse] ? count -1 : count +1
 				else 
 					puts "\t#{commit['subject']}"
 				end
