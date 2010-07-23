@@ -36,69 +36,124 @@ if (not options[:email])
 		exit 1
 	end
 end
+
+
+
 if (not options[:days])
 	options[:days] = 6
 end
 
-lines = `git log --pretty=format:"%ae||%s||%ci||%h" --since="#{options[:days]} days ago"`
-response_days = []
-responses_by_day = {}
-lines.each do | line |
-	if (line =~ /#{options[:email]}/i )  
-		components = line.split(/\|\|/)
-		date = components[2]
-		date.sub!(/(\S+).*/, '\1')
-		if (not responses_by_day[date])
-			responses_by_day[date] = []
-			response_days.push(date)
-		end
-#		
-#		# email, title, relative date
-		if (not options[:verbose])
-			responses_by_day[date].push(components[1])
-		else 
-			hash=components[3].chomp
-			raw_details = `git log --pretty=format:"%s%n%n%b" #{hash} -1`.chomp
-			response_details = ''
-			
-			raw_details.split(/\n/).each do | dl |
-				if (response_details)
-					response_details += "\t\t#{dl}\n"
-				else 
-					response_details = dl
-				end
-			end
-			responses_by_day[date].push(response_details)
-		end
+current_status = `git status`
+changes_present = false
+current_status.each do | line |
+	if (line =~ /# Changed but|# Changes to be/)
+		changes_present = true
+		break
 	end
 end
 
-puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
-if (options[:verbose])
-	branches = `git branch --no-color`
-	current_branch = nil
-	branches.each do |bn|
-		if (bn and bn =~ /\* (.*)/)
-			current_branch = $1
-			break
+if (changes_present)
+	puts "You have unsaved changes. Please stash or commit before running status-report" 
+	exit 1
+end
+
+branches = `git branch`
+branch_names = []
+initial_branch = nil
+branches.each do | branch | 
+	branch.chomp!
+	branch_name = branch
+	branch_name = branch_name.gsub(/^\*?\s+/, '')
+	if (branch.match( /^\*/) )
+		initial_branch = branch_name
+	end
+	branch_names.push(branch_name)
+end
+
+response_days = []
+responses_by_day = {}
+	# responses_by_day[iso_date][epoch_date] => {details, email, subject, iso_date, hash, epoch}
+	# a hash of hashes keyed by iso date
+	# within there is a hash keyed by epoch date
+	# each epoch date is the key to the details of what was commited at that moment
+	# we need the epoch date so that we can sort the items within the day because
+	# they're pulled in from multiple branches and thus not necessarily in order
+subjects_by_day ={} #guarantees we don't use the same subject from the same day from multiple branches
+
+
+branch_names.each do |branch |
+	`git checkout #{branch} 2>/dev/null`
+
+	lines = `git log --pretty=format:"%ae||%s||%ci||%h||%at" --since="#{options[:days]} days ago"`
+	lines.each do | line |
+		if (line =~ /#{options[:email]}/i )
+			components = line.split(/\|\|/)
+			response_hash = {
+				'details'	=> nil, #subject and body
+				'email' 	=> components[0],
+				'subject'	=> components[1],
+				'iso_date'=> components[2],
+				'hash'	=> components[3],
+				'epoch'	=> components[4].chomp #last one needs to be chomped
+			}
+			response_hash['iso_date'].sub!(/(\S+).*/, '\1')
+			date = response_hash['iso_date']
+			if (not responses_by_day[date])
+				responses_by_day[date] = {}
+				subjects_by_day[date] ={}
+				response_days.push(date)
+			end
+	#		
+	#		# email, title, iso 8601 date, abbreviated hash, unix date
+			if (not subjects_by_day[date][components[1]])
+				subjects_by_day[date][components[1]] = true
+				
+				if (options[:verbose])
+					raw_details = `git log --pretty=format:"%s%n%n%b" #{response_hash['hash']} -1`.chomp
+					response_details = ''
+					raw_details.split(/\n/).each do | dl |
+						if (response_details)
+							response_details += "\t\t#{dl}\n"
+						else 
+							response_details = dl
+						end
+					end
+					response_hash['details'] = response_details
+				end
+				responses_by_day[date][response_hash['epoch']] = response_hash
+			end
 		end
 	end
-	puts "  - Generated from \"#{current_branch}\" branch."
+end
+`git checkout #{initial_branch} 2>/dev/null`
+
+puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
+if (options[:verbose])
+	branches_string = ''
+	branch_names.each_index { |x|
+		branches_string  += (x != (branch_names.length() -1)) ? "#{branch_names[x]}, " : branch_names[x]
+		branches_string += "\n\t\t" if x % 3 == 0
+	}
+	puts "\t - Generated from branches: #{branches_string}"
 end
 if (response_days.length > 0)
+	response_days.sort!
 	response_days.each do | date |
 		
 		puts date if not options[:simple]
-		count = (responses_by_day[date].length > 1) ? responses_by_day[date].length : ''
-		responses_by_day[date].each do | commit | 
+		count = (responses_by_day[date].length > 1) ? 1 : ''
+		epoch_commit_times = responses_by_day[date].keys.sort
+		epoch_commit_times.each do |epoch|
+			commit = responses_by_day[date][epoch]
 			if (not options[:verbose])
-				puts "\t* #{commit}"
+				puts "\t* #{commit['subject']}"
 			else
 				if (count != '')
-					puts "\tcommit #{count}----------\n#{commit}"
-					count -= 1
+					puts "\tcommit #{count}----------"
+					puts commit['details']
+					count = count +1
 				else 
-					puts commit
+					puts "\t#{commit['subject']}"
 				end
 			end
 		end
