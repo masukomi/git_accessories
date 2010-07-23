@@ -1,6 +1,7 @@
 A tiny little repo of tiny little helper scripts for git.
 
-*git-who*
+git-who
+-------
 
 `Usage: git-who <filepath> [-v]`
 
@@ -11,16 +12,22 @@ Adding -v lists out the names of the people who have touched it, in order. Ex.:
 
    foo.sh: Bob Smith, Mary Smith, Bob Smith, Tom Jones, Bob Smith
 
-*git-status-report*
+git-status-report
+-----------------
 
-Generates a status report for what you (or a coworker) worked on for the past n days. 
+Generates a status report for what you (or a coworker) worked on for the past n days from 
+all of the branches in your repo.
+
 Useful for those once a week emails your boss is always asking for.
 
 `Usage: git status-report [-e <email>][-d <days>]
-	-e, --email <email address>      The email address of the committer to generate a report for. Defaults to your "git config user.email" address.
+	-e, --email <email address>      The email address of the committer to generate a report for. 
+	                                   Defaults to your "git config user.email" address.
 	-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
 	-s, --simple                     Simpler output. Doesn't include the dates
-	-v, --verbose                    Verbose output includes details on each commit`
+	-v, --verbose                    Verbose output includes details on each commit
+	-r, --reverse                    Displays output in reverse chronological order`
+
 
 
 
