@@ -3,75 +3,167 @@
 require 'optparse'
 
 
-options = {}
+#BEGIN Subroutines
+def process_options()
+	options = {}
+	optparse = OptionParser.new do | opts |
+		opts.banner = "Usage: git status-report [-e <email>][-d <days>]\nGenerates a status report for what you worked on for the past n days."
+		opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. Defaults to your \"git config user.email\" address.") do |email|
+			options[:email] = email
+		end
+		opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
+			options[:days] = days
+		end
+		opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
+			options[:simple] = true
+		end
+		opts.on("-v", "--verbose", "Verbose output includes details on each commit") do
+			options[:verbose] = true
+		end
+		opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
+			options[:reverse] = true
+		end
+	end
 
-optparse = OptionParser.new do | opts |
-	opts.banner = "Usage: git status-report [-e <email>][-d <days>]\nGenerates a status report for what you worked on for the past n days."
-	opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. Defaults to your \"git config user.email\" address.") do |email|
-		options[:email] = email
-	end
-	opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
-		options[:days] = days
-	end
-	opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
-		options[:simple] = true
-	end
-	opts.on("-v", "--verbose", "Verbose output includes details on each commit") do
-		options[:verbose] = true
-	end
-	opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
-		options[:reverse] = true
-	end
-end
-
-begin 
-	optparse.parse!
-rescue OptionParser::InvalidOption => e
-	puts e
-	puts optparse
-	exit 1
-end
-if (not options[:email])
-	options[:email] = `git config user.email`.chomp
-	if (not options[:email])
-		puts "You haven't configured an e-mail address for git. Please do so or specify one."
+	begin
+		optparse.parse!
+	rescue OptionParser::InvalidOption => e
+		puts e
 		puts optparse
 		exit 1
 	end
+	if (not options[:email])
+		options[:email] = `git config user.email`.chomp
+		if (options[:email] == '')
+			puts "You haven't configured an e-mail address for git. Please do so or specify one."
+			puts optparse
+			exit 1
+		end
+	end
+
+
+
+	if (not options[:days])
+		options[:days] = 6
+	end
+	return options
+end
+
+def find_git_repos
+	git_repos = {'includes' => [], 'excludes' => []}
+	raw_excludes = `git config --get status-report.exclude`
+	if (raw_excludes)
+		raw_excludes.each do | path |
+			# don't care if it's not a valid repo because we're not going to attempt
+			# to use anything in excludes
+			git_repos['excludes'].push(path.chomp!)
+		end
+	end
+	raw_includes = `git config --get-all status-report.include`
+	split_regexp = /\s*,\s*/ #should do a negative lookbehind to make sure it's not an escaped comma
+	if (raw_includes)
+		raw_includes.each do |path|
+			path.chomp!
+			#make sure it exists
+			if (FileTest.exist?(path) and FileTest.directory?(path))
+				test_path = path.sub(/\/$/, '')
+				test_path += '/.git'
+				# TODO: support wildcard exclusions
+				# ex  /home/username/personal_projects/*
+				if (FileTest.exist?(test_path) and FileTest.directory?(test_path) )
+					if (not git_repos['excludes'].include?(path))
+						git_repos['includes'].push(path)
+						#puts "adding #{path} from status-report.include"
+					end
+				else
+					puts "Skipping configured path which is not a non-bare git repo: #{path}"
+				end
+			else
+				puts "Skipping invalid configuration path (didn't exist or wasn't a dir): #{path}"
+			end
+		end
+	end
+	
+	if (git_repos['includes'].length == 0)
+		#nothing specified in the config
+		#maybe the current dir is a git repo
+		pwd = Dir.pwd
+		if (FileTest.exist?('./.git'))
+			git_repos['includes'].push(pwd)
+			puts "Will report on current repo."
+		else
+			#oh... well then. This won't be pretty
+			puts "Attempting to find git repos below the current directory."
+			puts "This would be much faster if you started in the repo you wanted to"
+			puts "report on or pre-configured repos to use."
+			raw_git_repo_paths = `find ./ -type d -name ".git" 2>/dev/null`.chomp
+			raw_repo_paths = raw_git_repo_paths.split(/\n/)
+			#these will look like   .//workspace/htop-osx/.git
+			# and we'll need to merge them with the current dir so that they match up with possible configured exclusions
+			if (raw_repo_paths.length > 0)
+				raw_repo_paths.each do | path | 
+					path.sub!(/^\.\//, '')
+					path.sub!(/\.git\/?/, '')
+					absolute_path = pwd + path
+					# TODO: support wildcard exclusions
+					# ex  /home/username/personal_projects/*
+					if (not git_repos['excludes'].include?(absolute_path))
+						git_repos['includes'].push(absolute_path)
+						#TODO: Ask the user if they'd like this repo added to the current configuration
+						#`git config --global --add status-report.include #{absolute_path}`
+					end
+				end
+			#else
+			#	puts "* none..."
+			end
+		end
+	end
+	
+	if (git_repos['includes'].length == 0)
+		puts "Unable to find any git repos to run a report on."
+		puts "Please configure the repos you want to run a report on or run this in a git repo."
+		exit 1
+	end
+	return git_repos
 end
 
 
-
-if (not options[:days])
-	options[:days] = 6
-end
-
-current_status = `git status`
-changes_present = false
-current_status.each do | line |
-	if (line =~ /# Changed but|# Changes to be/)
-		changes_present = true
-		break
+def confirm_saved_changes(git_repos)
+	initial_dir = Dir.pwd
+	unsaved_changes = false
+	git_repos['includes'].each do |path|
+		Dir.chdir(path) #already tested for existence and the fact that it's a dir.
+		#puts "confirming no unsaved changes in #{path}"
+		current_status = `git status`
+		changes_present = false
+		current_status.each do | line |
+			if (line =~ /# Changed but|# Changes to be/)
+				changes_present = true
+				break
+			end
+		end
+		if (changes_present)
+			puts "You have unsaved changes in repo at #{path}" 
+			unsaved_changes = true
+		end
+	end
+	if (unsaved_changes)
+		puts "Please stash or commit all unsaved changes before running status-report"
+		exit 1 #they've already been informed why
 	end
 end
 
-if (changes_present)
-	puts "You have unsaved changes. Please stash or commit before running status-report" 
-	exit 1
-end
 
-branches = `git branch`
-branch_names = []
-initial_branch = nil
-branches.each do | branch | 
-	branch.chomp!
-	branch_name = branch
-	branch_name = branch_name.gsub(/^\*?\s+/, '')
-	if (branch.match( /^\*/) )
-		initial_branch = branch_name
-	end
-	branch_names.push(branch_name)
-end
+#END Subroutines
+
+
+
+options = process_options()
+git_repos = find_git_repos() # will exit if it can't find any repos
+							 # has includes and excludes keys, but includes only includes items 
+							 # that weren't excluded by the exclude rules.
+confirm_saved_changes(git_repos) # will exit if there are any unsaved changes
+
 
 response_days = []
 responses_by_day = {}
@@ -84,61 +176,73 @@ responses_by_day = {}
 subjects_by_day ={} #guarantees we don't use the same subject from the same day from multiple branches
 
 
-branch_names.each do |branch |
-	`git checkout #{branch} 2>/dev/null`
-
-	lines = `git log --pretty=format:"%ae||%s||%ci||%h||%at" --since="#{options[:days]} days ago"`
-	lines.each do | line |
-		if (line =~ /#{options[:email]}/i )
-			components = line.split(/\|\|/)
-			response_hash = {
-				'details'	=> nil, #subject and body
-				'email' 	=> components[0],
-				'subject'	=> components[1],
-				'iso_date'=> components[2],
-				'hash'	=> components[3],
-				'epoch'	=> components[4].chomp #last one needs to be chomped
-			}
-			response_hash['iso_date'].sub!(/(\S+).*/, '\1')
-			date = response_hash['iso_date']
-			if (not responses_by_day[date])
-				responses_by_day[date] = {}
-				subjects_by_day[date] ={}
-				response_days.push(date)
-			end
-	#		
-	#		# email, title, iso 8601 date, abbreviated hash, unix date
-			if (not subjects_by_day[date][components[1]])
-				subjects_by_day[date][components[1]] = true
-				
-				if (options[:verbose])
-					raw_details = `git log --pretty=format:"%s%n%n%b" #{response_hash['hash']} -1`.chomp
-					response_details = ''
-					raw_details.split(/\n/).each do | dl |
-						if (response_details)
-							response_details += "\t\t#{dl}\n"
-						else 
-							response_details = dl
-						end
-					end
-					response_hash['details'] = response_details
+initial_dir = Dir.pwd
+unsaved_changes = false
+git_repos['includes'].each do |path|
+	# find_git_repos will automatically filter anything out of the includes list that 
+	# needs to be excluded.
+	
+	#puts "getting status with repo at #{path}"
+	Dir.chdir(path)
+	
+	branches = `git branch`
+	branch_names = []
+	initial_branch = nil
+	branches.each do | branch | 
+		branch.chomp!
+		branch_name = branch
+		branch_name = branch_name.gsub(/^\*?\s+/, '')
+		if (branch.match( /^\*/) )
+			initial_branch = branch_name
+		end
+		branch_names.push(branch_name)
+	end
+	
+	
+	
+	branch_names.each do |branch |
+		`git checkout #{branch} 2>/dev/null`
+		
+		lines = `git log --pretty=format:"%ae||%s||%ci||%h||%at" --since="#{options[:days]} days ago"`
+		lines.each do | line |
+			if (line =~ /#{options[:email]}/i )
+				components = line.split(/\|\|/)
+				response_hash = {
+					'branch'	=> branch,
+					'repo'		=> path,
+					'details'	=> nil, #subject and body
+					'email' 	=> components[0],
+					'subject'	=> components[1],
+					'iso_date'=> components[2],
+					'hash'	=> components[3],
+					'epoch'	=> components[4].chomp #last one needs to be chomped
+				}
+				response_hash['iso_date'].sub!(/(\S+).*/, '\1')
+				date = response_hash['iso_date']
+				if (not responses_by_day[date])
+					responses_by_day[date] = {}
+					subjects_by_day[date] ={}
+					response_days.push(date)
 				end
-				responses_by_day[date][response_hash['epoch']] = response_hash
+				
+				# email, title, iso 8601 date, abbreviated hash, unix date
+				if (not subjects_by_day[date][components[1]])
+					subjects_by_day[date][components[1]] = true
+					
+					if (options[:verbose])
+						raw_details = `git log --pretty=format:"%s%n%n%b" #{response_hash['hash']} -1`.chomp
+						response_hash['details'] = raw_details
+					end
+					responses_by_day[date][response_hash['epoch']] = response_hash
+				end
 			end
 		end
-	end
-end
-`git checkout #{initial_branch} 2>/dev/null`
+	end # end iterating over branches
+	`git checkout #{initial_branch} 2>/dev/null`
+end # end iterating over repos
+Dir.chdir(initial_dir)
 
 puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
-if (options[:verbose])
-	branches_string = ''
-	branch_names.each_index { |x|
-		branches_string  += (x != (branch_names.length() -1)) ? "#{branch_names[x]}, " : branch_names[x]
-		branches_string += "\n\t\t" if x % 3 == 0
-	}
-	puts "\t - Generated from branches: #{branches_string}"
-end
 if (response_days.length > 0)
 	response_days.sort!
 	if (options[:reverse])
@@ -164,10 +268,16 @@ if (response_days.length > 0)
 			else
 				if (count != '')
 					puts "\tcommit #{count}----------"
-					puts commit['details']
+					commit['details'].split(/\n/).each do | dl |
+						puts "\t\t#{dl}"
+					end
+					puts "\t\t[Found in branch \"#{commit['branch']}\" of repo at #{commit['repo']}]" 
 					count = options[:reverse] ? count -1 : count +1
 				else 
-					puts "\t#{commit['subject']}"
+					commit['details'].split(/\n/).each do | dl |
+						puts "\t#{dl}"
+					end
+					puts "\t[Found in branch \"#{commit['branch']}\" of repo at #{commit['repo']}]" 
 				end
 			end
 		end
@@ -175,4 +285,7 @@ if (response_days.length > 0)
 else
 	puts "No commits found for #{options[:email]}"
 end
+
+
+
 

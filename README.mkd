@@ -1,7 +1,7 @@
 A tiny little repo of tiny little helper scripts for git.
 
 git-who
--------
+=======
 
 `Usage: git-who <filepath> [-v]`
 
@@ -12,11 +12,13 @@ Adding -v lists out the names of the people who have touched it, in order. Ex.:
 
    foo.sh: Bob Smith, Mary Smith, Bob Smith, Tom Jones, Bob Smith
 
+--------------------------------------------------------------------------------------------
+
 git-status-report
------------------
+=================
 
 Generates a status report for what you (or a coworker) worked on for the past n days from 
-all of the branches in your repo.
+all of the branches from a pre-configured list of repos (see below) or the current repo.
 
 Useful for those once a week emails your boss is always asking for.
 
@@ -29,5 +31,39 @@ Useful for those once a week emails your boss is always asking for.
 	-r, --reverse                    Displays output in reverse chronological order`
 
 
+If you wish to pre-configure a list of repos to build you status report from 
+(and you should) you can do so by adding them to git's global config 
+as shown below. You can add as many include or exclude paths as you'd like.
+of *absolute* paths to your local repos (the folder containing the .git folder).
+Verbose mode will let you know which branch of which repo each item came from.
+
+If you don't specify any "includes" it will attempt to find repos in the current directory or 
+directories below it.
+
+`git config --global --add status-report.include /Users/masukomi/workspace/git_accessories
+git config --global --add status-report.include /Users/masukomi/workspace/jsonpath-perl
+git config --global --add status-report.exclude /Users/masukomi/workspace/some_repo_i_want_excluded_from_status-report`
 
 
+Please note that it does not currently support wildcard exclusions.
+
+Finding Repos when none are configured
+--------------------------------------
+
+git-status-report will looks in three places for repos and uses whichever one works first.
+
+1. it will check the git global config for "include" repos.
+2. it will check if the current directory is a working repo.
+3. it will do a "find" to discover any working repos below the current directory.
+
+All of these are trumped by paths excluded in the global config.
+
+Finding repos is really rather slow. It's always a better idea to pre-configure them.
+
+Planned Features
+-----------------
+* wildcard support on exclusions so that you can exclude something like /home/username/privateProjects/\*
+* interactively ask users if they'd like discovered repos added to the configuration.
+
+Interested in helping? Fork this repo (preferably on Github) and look for the TODO comments. 
+Then request a pull when you've got something ready to add.
