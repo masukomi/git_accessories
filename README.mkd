@@ -12,7 +12,6 @@ Adding -v lists out the names of the people who have touched it, in order. Ex.:
 
    foo.sh: Bob Smith, Mary Smith, Bob Smith, Tom Jones, Bob Smith
 
---------------------------------------------------------------------------------------------
 
 git-status-report
 =================
@@ -22,13 +21,13 @@ all of the branches from a pre-configured list of repos (see below) or the curre
 
 Useful for those once a week emails your boss is always asking for.
 
-`Usage: git status-report [-e <email>][-d <days>]
-	-e, --email <email address>      The email address of the committer to generate a report for. 
-	                                   Defaults to your "git config user.email" address.
-	-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
-	-s, --simple                     Simpler output. Doesn't include the dates
-	-v, --verbose                    Verbose output includes details on each commit
-	-r, --reverse                    Displays output in reverse chronological order`
+	Usage: git status-report [-e <email>][-d <days>]
+		-e, --email <email address>      The email address of the committer to generate a report for. 
+										   Defaults to your "git config user.email" address.
+		-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
+		-s, --simple                     Simpler output. Doesn't include the dates
+		-v, --verbose                    Verbose output includes details on each commit
+		-r, --reverse                    Displays output in reverse chronological order
 
 
 If you wish to pre-configure a list of repos to build you status report from 
@@ -40,9 +39,9 @@ Verbose mode will let you know which branch of which repo each item came from.
 If you don't specify any "includes" it will attempt to find repos in the current directory or 
 directories below it.
 
-`git config --global --add status-report.include /Users/masukomi/workspace/git_accessories
-git config --global --add status-report.include /Users/masukomi/workspace/jsonpath-perl
-git config --global --add status-report.exclude /Users/masukomi/workspace/some_repo_i_want_excluded_from_status-report`
+	git config --global --add status-report.include /Users/masukomi/workspace/git_accessories
+	git config --global --add status-report.include /Users/masukomi/workspace/jsonpath-perl
+	git config --global --add status-report.exclude /Users/masukomi/workspace/some_repo_i_want_excluded_from_status-report
 
 
 Please note that it does not currently support wildcard exclusions.
@@ -67,3 +66,65 @@ Planned Features
 
 Interested in helping? Fork this repo (preferably on Github) and look for the TODO comments. 
 Then request a pull when you've got something ready to add.
+
+### Example output ###
+
+#### Default output ####
+	$ git status-report -d 10
+	Status report for "masukomi@masukomi.org" (last 10 days)
+	2010-07-19
+		* git-status-report now notes branch it was generated from in verbose mode
+		* Added break to git-status-report's current branch lookup for efficiency.
+	2010-07-21
+		* mistakenly had -s instead of -v for short version of --verbose
+		* Updated README to include git-status-report info
+	2010-07-23
+		* git-status-report now generates report from all branches
+		* git-status-report now supports a --reverse option
+		* Updated README.mkdn to include info on --reverse
+
+
+#### Simple Output ####
+	$ git status-report -sd 10
+	Status report for "masukomi@masukomi.org" (last 10 days)
+		* git-status-report now notes branch it was generated from in verbose mode
+		* Added break to git-status-report's current branch lookup for efficiency.
+		* mistakenly had -s instead of -v for short version of --verbose
+		* Updated README to include git-status-report info
+		* git-status-report now generates report from all branches
+		* git-status-report now supports a --reverse option
+		* Updated README.mkdn to include info on --reverse
+
+#### Verbose Output ####
+	$ git status-report -vd7
+	Status report for "masukomi@masukomi.org" (last 7 days)
+	2010-07-21
+		commit 1----------
+			mistakenly had -s instead of -v for short version of --verbose
+			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
+		commit 2----------
+			Updated README to include git-status-report info
+			
+			* added markdown formatting
+			* renamed file README -> README.mkd
+			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
+	2010-07-23
+		commit 1----------
+			git-status-report now generates report from all branches
+			
+			* output has been sorted chronologically (instead of reverse cron)
+				this is because it makes a more sensible default for
+				something you're giving to a boss. AND because the next
+				commit will be a --reverse option which gives you the
+				some info in reverse chronological order.
+			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
+		commit 2----------
+			git-status-report now supports a --reverse option
+			
+			* produces output in reverse chronological order
+			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
+		commit 3----------
+			Updated README.mkdn to include info on --reverse
+			
+			* also did minor formatting changes
+			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
