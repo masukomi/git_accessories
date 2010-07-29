@@ -88,6 +88,9 @@ def find_git_repos
 		#nothing specified in the config
 		#maybe the current dir is a git repo
 		pwd = Dir.pwd
+		if (pwd !~ /\/$/)
+			pwd += '/' #linux needs this, os x doesn't.
+		end
 		if (FileTest.exist?('./.git'))
 			git_repos['includes'].push(pwd)
 			puts "Will report on current repo."
@@ -108,9 +111,13 @@ def find_git_repos
 					# TODO: support wildcard exclusions
 					# ex  /home/username/personal_projects/*
 					if (not git_repos['excludes'].include?(absolute_path))
-						git_repos['includes'].push(absolute_path)
-						#TODO: Ask the user if they'd like this repo added to the current configuration
-						#`git config --global --add status-report.include #{absolute_path}`
+						if (FileTest.exist?(absolute_path))
+							git_repos['includes'].push(absolute_path)
+							#TODO: Ask the user if they'd like this repo added to the current configuration
+							#`git config --global --add status-report.include #{absolute_path}`
+						else
+							puts "Problem generating or finding sub-repo path. Couldn't find \"#{absolute_path}\""
+						end
 					end
 				end
 			#else
