@@ -21,6 +21,8 @@ all of the branches from a pre-configured list of repos (see below) or the curre
 
 Useful for those once a week emails your boss is always asking for.
 
+*Please note. git-status-report requires the Grit gem to function (gem install grit).*
+
 	Usage: git status-report [-e <email>][-d <days>]
 		-e, --email <email address>      The email address of the committer to generate a report for. 
 										   Defaults to your "git config user.email" address.

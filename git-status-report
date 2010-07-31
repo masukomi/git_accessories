@@ -1,6 +1,8 @@
 #!/usr/bin/ruby -W0
-
+require 'rubygems'
 require 'optparse'
+require 'grit'
+include Grit
 
 
 #BEGIN Subroutines
@@ -46,6 +48,7 @@ def process_options()
 	if (not options[:days])
 		options[:days] = 6
 	end
+	options[:since] = (Date.new() - options[:days])
 	return options
 end
 
@@ -134,29 +137,12 @@ def find_git_repos
 	return git_repos
 end
 
-
-def confirm_saved_changes(git_repos)
-	initial_dir = Dir.pwd
-	unsaved_changes = false
-	git_repos['includes'].each do |path|
-		Dir.chdir(path) #already tested for existence and the fact that it's a dir.
-		#puts "confirming no unsaved changes in #{path}"
-		current_status = `git status`
-		changes_present = false
-		current_status.each do | line |
-			if (line =~ /# Changed but|# Changes to be/)
-				changes_present = true
-				break
-			end
-		end
-		if (changes_present)
-			puts "You have unsaved changes in repo at #{path}" 
-			unsaved_changes = true
-		end
-	end
-	if (unsaved_changes)
-		puts "Please stash or commit all unsaved changes before running status-report"
-		exit 1 #they've already been informed why
+# initializes a grit Repo for each include path
+# and sticks them in the git_repos hash under the grit key
+def initialize_grit_repos (git_repos)
+	git_repos['grit'] = []
+	git_repos['includes'].each do | path |
+		git_repos['grit'].push(Repo.new(path))
 	end
 end
 
@@ -169,12 +155,13 @@ options = process_options()
 git_repos = find_git_repos() # will exit if it can't find any repos
 							 # has includes and excludes keys, but includes only includes items 
 							 # that weren't excluded by the exclude rules.
-confirm_saved_changes(git_repos) # will exit if there are any unsaved changes
+initialize_grit_repos(git_repos) #ads grit Repo objects to the git_repos hash under 'grit' key
+#confirm_saved_changes(git_repos) # will exit if there are any unsaved changes
 
 
 response_days = []
 responses_by_day = {}
-	# responses_by_day[iso_date][epoch_date] => {details, email, subject, iso_date, hash, epoch}
+	# responses_by_day[date_string][epoch_date] => {branch, repo, commit, subject}
 	# a hash of hashes keyed by iso date
 	# within there is a hash keyed by epoch date
 	# each epoch date is the key to the details of what was commited at that moment
@@ -185,69 +172,45 @@ subjects_by_day ={} #guarantees we don't use the same subject from the same day 
 
 initial_dir = Dir.pwd
 unsaved_changes = false
-git_repos['includes'].each do |path|
+git_repos['grit'].each do |repo|
 	# find_git_repos will automatically filter anything out of the includes list that 
 	# needs to be excluded.
 	
-	#puts "getting status with repo at #{path}"
-	Dir.chdir(path)
-	
-	branches = `git branch`
-	branch_names = []
-	initial_branch = nil
-	branches.each do | branch | 
-		branch.chomp!
-		branch_name = branch
-		branch_name = branch_name.gsub(/^\*?\s+/, '')
-		if (branch.match( /^\*/) )
-			initial_branch = branch_name
-		end
-		branch_names.push(branch_name)
-	end
+	# we want all the commits to all branches since option[:days] days ago
 	
 	
+	branches = repo.heads() #an array of Grit::Head objects
 	
-	branch_names.each do |branch |
-		`git checkout #{branch} 2>/dev/null`
-		
-		lines = `git log --pretty=format:"%ae||%s||%ci||%h||%at" --since="#{options[:days]} days ago"`
-		lines.each do | line |
-			if (line =~ /#{options[:email]}/i )
-				components = line.split(/\|\|/)
+	branches.each do | branch |
+		branch_commits = repo.commits_since(branch.name, options[:since].to_s ) #chronological ordering of commits
+		branch_commits.each do | commit | 
+			#puts commit.to_hash().inspect()
+			if commit.author.email == options[:email]
+				commit_hash = commit.to_hash()
 				response_hash = {
 					'branch'	=> branch,
-					'repo'		=> path,
-					'details'	=> nil, #subject and body
-					'email' 	=> components[0],
-					'subject'	=> components[1],
-					'iso_date'=> components[2],
-					'hash'	=> components[3],
-					'epoch'	=> components[4].chomp #last one needs to be chomped
+					'repo'		=> repo,
+					'commit'	=> commit,
+					'subject'	=> commit.message.split(/\n/)[0]
 				}
-				response_hash['iso_date'].sub!(/(\S+).*/, '\1')
-				date = response_hash['iso_date']
-				if (not responses_by_day[date])
-					responses_by_day[date] = {}
-					subjects_by_day[date] ={}
-					response_days.push(date)
+				#commit.date() is a Time object 2010-07-26T22:46:41-04:00
+				date_string = "#{commit.date().year}-#{commit.date().month}-#{commit.date().day}"
+				if (not responses_by_day[date_string])
+					responses_by_day[date_string] = {}
+					subjects_by_day[date_string] ={}
+					response_days.push(date_string)
 				end
-				
-				# email, title, iso 8601 date, abbreviated hash, unix date
-				if (not subjects_by_day[date][components[1]])
-					subjects_by_day[date][components[1]] = true
+				if (not subjects_by_day[date_string][response_hash['subject']])
+					subjects_by_day[date_string][response_hash['subject']] = true
 					
-					if (options[:verbose])
-						raw_details = `git log --pretty=format:"%s%n%n%b" #{response_hash['hash']} -1`.chomp
-						response_hash['details'] = raw_details
-					end
-					responses_by_day[date][response_hash['epoch']] = response_hash
+					responses_by_day[date_string][commit.date().to_i] = response_hash
 				end
 			end
 		end
-	end # end iterating over branches
-	`git checkout #{initial_branch} 2>/dev/null`
+	end
 end # end iterating over repos
-Dir.chdir(initial_dir)
+
+days=['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
 if (response_days.length > 0)
@@ -269,22 +232,25 @@ if (response_days.length > 0)
 			epoch_commit_times.reverse!
 		end
 		epoch_commit_times.each do |epoch|
-			commit = responses_by_day[date][epoch]
+			
+			commit_info = responses_by_day[date][epoch]
+			commit = commit_info['commit']
+			commit_hash = commit.to_hash()
 			if (not options[:verbose])
-				puts "\t* #{commit['subject']}"
+				puts "\t* #{commit_info['subject']}"
 			else
 				if (count != '')
 					puts "\tcommit #{count}----------"
-					commit['details'].split(/\n/).each do | dl |
-						puts "\t\t#{dl}"
+					commit_hash['message'].split(/\n/).each do | message_line |
+						puts "\t\t#{message_line}"
 					end
-					puts "\t\t[Found in branch \"#{commit['branch']}\" of repo at #{commit['repo']}]" 
+					puts "\t\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
 					count = options[:reverse] ? count -1 : count +1
 				else 
-					commit['details'].split(/\n/).each do | dl |
-						puts "\t#{dl}"
+					commit_hash['message'].split(/\n/).each do | message_line |
+						puts "\t#{message_line}"
 					end
-					puts "\t[Found in branch \"#{commit['branch']}\" of repo at #{commit['repo']}]" 
+					puts "\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
 				end
 			end
 		end
