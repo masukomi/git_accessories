@@ -25,6 +25,10 @@ def process_options()
 		opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
 			options[:reverse] = true
 		end
+		opts.on("-h", "--help", "Displays this message") do 
+			puts optparse
+			exit 0
+		end
 	end
 
 	begin
