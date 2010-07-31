@@ -206,7 +206,7 @@ git_repos['grit'].each do |repo|
 					'subject'	=> commit.message.split(/\n/)[0]
 				}
 				#commit.date() is a Time object 2010-07-26T22:46:41-04:00
-				date_string = "#{commit.date().year}-#{commit.date().month}-#{commit.date().day}"
+				date_string = sprintf "%02d-%02d-%02d" % [commit.date().year, commit.date().month, commit.date().day]
 				if (not responses_by_day[date_string])
 					responses_by_day[date_string] = {}
 						# if not optoins[:all] this will be keyed by epoch time of commit
