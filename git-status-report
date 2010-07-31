@@ -25,6 +25,9 @@ def process_options()
 		opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
 			options[:reverse] = true
 		end
+		opts.on("-a", "--all", "Displays output for all contributers sorted by person") do 
+			options[:all] = true
+		end
 		opts.on("-h", "--help", "Displays this message") do 
 			puts optparse
 			exit 0
@@ -176,6 +179,8 @@ subjects_by_day ={} #guarantees we don't use the same subject from the same day 
 
 initial_dir = Dir.pwd
 unsaved_changes = false
+
+longest_name = options[:all] ? 0 : nil
 git_repos['grit'].each do |repo|
 	# find_git_repos will automatically filter anything out of the includes list that 
 	# needs to be excluded.
@@ -189,7 +194,10 @@ git_repos['grit'].each do |repo|
 		branch_commits = repo.commits_since(branch.name, options[:since].to_s ) #chronological ordering of commits
 		branch_commits.each do | commit | 
 			#puts commit.to_hash().inspect()
-			if commit.author.email == options[:email]
+			if commit.author.email == options[:email] or options[:all]
+				if (options[:all])
+					longest_name = commit.author.name.length if commit.author.name.length > longest_name
+				end
 				commit_hash = commit.to_hash()
 				response_hash = {
 					'branch'	=> branch,
@@ -201,14 +209,20 @@ git_repos['grit'].each do |repo|
 				date_string = "#{commit.date().year}-#{commit.date().month}-#{commit.date().day}"
 				if (not responses_by_day[date_string])
 					responses_by_day[date_string] = {}
+						# if not optoins[:all] this will be keyed by epoch time of commit
+						# otherwise it'll be keyed by committer which will contain a hash with epoch time keys
 					subjects_by_day[date_string] ={}
+					if (options[:all] and not subjects_by_day[date_string][commit.author.email])
+						subjects_by_day[date_string][commit.author.email] = {}
+					end
 					response_days.push(date_string)
 				end
-				if (not subjects_by_day[date_string][response_hash['subject']])
-					subjects_by_day[date_string][response_hash['subject']] = true
-					
-					responses_by_day[date_string][commit.date().to_i] = response_hash
-				end
+				responses_by_day[date_string][commit.date().to_i] = response_hash
+					# betting on the unlikelyhood of two people commiting at the same second
+					# eventually this will need to be addressed
+					if (not subjects_by_day[date_string][response_hash['subject']])
+						subjects_by_day[date_string][response_hash['subject']] = true
+					end
 			end
 		end
 	end
@@ -241,7 +255,11 @@ if (response_days.length > 0)
 			commit = commit_info['commit']
 			commit_hash = commit.to_hash()
 			if (not options[:verbose])
-				puts "\t* #{commit_info['subject']}"
+				if (not options[:all])
+					puts "\t* #{commit_info['subject']}"
+				else
+					puts "\t* [%-#{longest_name}s] %s" % [commit.author.name , commit_info['subject']]
+				end
 			else
 				if (count != '')
 					puts "\tcommit #{count}----------"
