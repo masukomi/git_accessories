@@ -14,7 +14,7 @@ def process_options()
 			options[:email] = email
 		end
 		opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
-			options[:days] = days
+			options[:days] = days.to_i
 		end
 		opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
 			options[:simple] = true
@@ -55,7 +55,7 @@ def process_options()
 	if (not options[:days])
 		options[:days] = 6
 	end
-	options[:since] = (Date.new() - options[:days])
+	options[:since] = Time.parse((Date.today() - options[:days]).to_s)
 	return options
 end
 
@@ -191,10 +191,13 @@ git_repos['grit'].each do |repo|
 	branches = repo.heads() #an array of Grit::Head objects
 	
 	branches.each do | branch |
-		branch_commits = repo.commits_since(branch.name, options[:since].to_s ) #chronological ordering of commits
+		branch_commits = repo.commits_since(branch.name, options[:since] ) #chronological ordering of commits
 		branch_commits.each do | commit | 
 			#puts commit.to_hash().inspect()
-			if commit.author.email == options[:email] or options[:all]
+			if ( (commit.author.email == options[:email] or options[:all]) and commit.date() >= options[:since] )
+				# there's currently a bug in grit where commits outside of the specified date range will be returned.
+				# the date check above compensates for that until the patch has been pulled into grit and distributed
+				# widely. - masukomi 7 / 31 / 10
 				if (options[:all])
 					longest_name = commit.author.name.length if commit.author.name.length > longest_name
 				end
