@@ -233,7 +233,9 @@ end # end iterating over repos
 
 days=['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-puts "Status report for \"#{options[:email]}\" (last #{options[:days]} days)"
+puts "Status report for #{options[:all] ? 'All contributors' : options[:email]} (last #{options[:days]} days)"
+
+
 if (response_days.length > 0)
 	response_days.sort!
 	if (options[:reverse])
@@ -261,17 +263,24 @@ if (response_days.length > 0)
 				if (not options[:all])
 					puts "\t* #{commit_info['subject']}"
 				else
-					puts "\t* [%-#{longest_name}s] %s" % [commit.author.name , commit_info['subject']]
+					puts "\t* [ %-#{longest_name}s ] %s" % [commit.author.name , commit_info['subject']]
 				end
 			else
-				if (count != '')
-					puts "\tcommit #{count}----------"
+				if (count != '') # a multi-commit day
+					if (not options[:all])
+						puts "\tcommit #{count}---------- "
+					else
+						puts "\tcommit %d -- [ %-#{longest_name}s ] ---------- " % [count, commit.author.name]
+					end
 					commit_hash['message'].split(/\n/).each do | message_line |
 						puts "\t\t#{message_line}"
 					end
 					puts "\t\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
 					count = options[:reverse] ? count -1 : count +1
-				else 
+				else # just one commit this day
+					if (options[:all])
+						puts "\t[ %-#{longest_name}s ] ---------- " % [commit.author.name]
+					end
 					commit_hash['message'].split(/\n/).each do | message_line |
 						puts "\t#{message_line}"
 					end
