@@ -24,12 +24,14 @@ Useful for those once a week emails your boss is always asking for.
 *Please note. git-status-report requires the Grit gem to function (gem install grit).*
 
 	Usage: git status-report [-e <email>][-d <days>]
-		-e, --email <email address>      The email address of the committer to generate a report for. 
-										   Defaults to your "git config user.email" address.
+	Generates a status report for what you worked on for the past n days.
+		-e, --email <email address>      The email address of the committer to generate a report for. Defaults to your "git config user.email" address.
 		-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
 		-s, --simple                     Simpler output. Doesn't include the dates
 		-v, --verbose                    Verbose output includes details on each commit
 		-r, --reverse                    Displays output in reverse chronological order
+		-a, --all                        Displays output for all contributers sorted by person
+		-h, --help                       Displays this message
 
 
 If you wish to pre-configure a list of repos to build you status report from 
@@ -130,3 +132,8 @@ Then request a pull when you've got something ready to add.
 			
 			* also did minor formatting changes
 			[Found in branch "development" of repo at /Users/masukomi/workspace/git_accessories]
+
+#### "all" output ####
+
+Output for the -a / --all option is essentially the same as the output above only with the addition 
+of a note as to which commit came from which contributer.
