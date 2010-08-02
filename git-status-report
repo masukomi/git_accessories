@@ -53,7 +53,8 @@ def process_options()
 
 
 	if (not options[:days])
-		options[:days] = 6
+		config_days = `git config --get status-report.days`.chomp
+		options[:days] = config_days != '' ? config_days.to_i : 6
 	end
 	options[:since] = Time.parse((Date.today() - options[:days]).to_s)
 	return options

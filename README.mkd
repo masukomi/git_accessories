@@ -50,6 +50,17 @@ directories below it.
 
 Please note that it does not currently support wildcard exclusions.
 
+Configuration Options
+---------------------
+In addition to configuring includes and excludes you can pre-configure the number of 
+days you want the status report to include in its run without having to manually 
+specify it on the command line. By default it will include 6 days which is perfect 
+if you run it on Fridays and want the previous week's work. But if you
+run it on a Monday you'll probably want it to default to seven. 
+
+	git config --global --replace-all status-report.days 7
+
+
 Finding Repos when none are configured
 --------------------------------------
 
@@ -65,11 +76,8 @@ Finding repos is really rather slow. It's always a better idea to pre-configure 
 
 Planned Features
 -----------------
-* wildcard support on exclusions so that you can exclude something like /home/username/privateProjects/\*
-* interactively ask users if they'd like discovered repos added to the configuration.
-
-Interested in helping? Fork this repo (preferably on Github) and look for the TODO comments. 
-Then request a pull when you've got something ready to add.
+Please see the wiki page on github. If you're interested in helping please fork 
+this repo (preferably on Github) and request a pull when you've got something ready to add.
 
 ### Example output ###
 
