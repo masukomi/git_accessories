@@ -28,6 +28,9 @@ def process_options()
 		opts.on("-a", "--all", "Displays output for all contributers sorted by person") do 
 			options[:all] = true
 		end
+		opts.on('-c', '--current', "Generates status report for the current repo only") do
+			options[:current] = true
+		end
 		opts.on("-h", "--help", "Displays this message") do 
 			puts optparse
 			exit 0
@@ -60,50 +63,68 @@ def process_options()
 	return options
 end
 
-def find_git_repos
-	git_repos = {'includes' => [], 'excludes' => []}
-	raw_excludes = `git config --get status-report.exclude`
-	if (raw_excludes)
-		raw_excludes.each do | path |
-			# don't care if it's not a valid repo because we're not going to attempt
-			# to use anything in excludes
-			git_repos['excludes'].push(path.chomp!)
+def is_dir_git_repo(path, check_excludes = true)
+	test_path = path.sub(/\/$/, '')
+	test_path += '/.git'
+	if (FileTest.exist?(test_path) and FileTest.directory?(test_path) )
+		if (check_excludes)
+			if (not @git_repos['excludes'].include?(path))
+				return true
+				#puts "adding #{path} from status-report.include"
+			end
+		else
+			return true
 		end
 	end
-	raw_includes = `git config --get-all status-report.include`
-	split_regexp = /\s*,\s*/ #should do a negative lookbehind to make sure it's not an escaped comma
-	if (raw_includes)
-		raw_includes.each do |path|
-			path.chomp!
-			#make sure it exists
-			if (FileTest.exist?(path) and FileTest.directory?(path))
-				test_path = path.sub(/\/$/, '')
-				test_path += '/.git'
-				# TODO: support wildcard exclusions
-				# ex  /home/username/personal_projects/*
-				if (FileTest.exist?(test_path) and FileTest.directory?(test_path) )
-					if (not git_repos['excludes'].include?(path))
-						git_repos['includes'].push(path)
-						#puts "adding #{path} from status-report.include"
+	return false
+end
+
+def find_git_repos
+	pwd = Dir.pwd
+	@git_repos = {'includes' => [], 'excludes' => []}
+	if (not @options[:current])
+		raw_excludes = `git config --get status-report.exclude`
+		if (raw_excludes)
+			raw_excludes.each do | path |
+				# don't care if it's not a valid repo because we're not going to attempt
+				# to use anything in excludes
+				@git_repos['excludes'].push(path.chomp!)
+			end
+		end
+		raw_includes = `git config --get-all status-report.include`
+		split_regexp = /\s*,\s*/ #should do a negative lookbehind to make sure it's not an escaped comma
+		if (raw_includes)
+			raw_includes.each do |path|
+				path.chomp!
+				#make sure it exists
+				if (FileTest.exist?(path) and FileTest.directory?(path))
+					if (is_dir_git_repo(path))
+						@git_repos['includes'].push(path)
+					else
+						puts "Skipping configured path which is not a non-bare git repo: #{path}"
 					end
 				else
-					puts "Skipping configured path which is not a non-bare git repo: #{path}"
+					puts "Skipping invalid configuration path (didn't exist or wasn't a dir): #{path}"
 				end
-			else
-				puts "Skipping invalid configuration path (didn't exist or wasn't a dir): #{path}"
 			end
+		end
+	else
+		if (is_dir_git_repo(pwd, false))
+			@git_repos['includes'].push(pwd)
+		else
+			puts "Current directory is not a non-bare git rep"
+			exit 1
 		end
 	end
 	
-	if (git_repos['includes'].length == 0)
+	if (@git_repos['includes'].length == 0)
 		#nothing specified in the config
 		#maybe the current dir is a git repo
-		pwd = Dir.pwd
 		if (pwd !~ /\/$/)
 			pwd += '/' #linux needs this, os x doesn't.
 		end
 		if (FileTest.exist?('./.git'))
-			git_repos['includes'].push(pwd)
+			@git_repos['includes'].push(pwd)
 			puts "Will report on current repo."
 		else
 			#oh... well then. This won't be pretty
@@ -121,9 +142,9 @@ def find_git_repos
 					absolute_path = pwd + path
 					# TODO: support wildcard exclusions
 					# ex  /home/username/personal_projects/*
-					if (not git_repos['excludes'].include?(absolute_path))
+					if (not @git_repos['excludes'].include?(absolute_path))
 						if (FileTest.exist?(absolute_path))
-							git_repos['includes'].push(absolute_path)
+							@git_repos['includes'].push(absolute_path)
 							#TODO: Ask the user if they'd like this repo added to the current configuration
 							#`git config --global --add status-report.include #{absolute_path}`
 						else
@@ -137,12 +158,12 @@ def find_git_repos
 		end
 	end
 	
-	if (git_repos['includes'].length == 0)
+	if (@git_repos['includes'].length == 0)
 		puts "Unable to find any git repos to run a report on."
 		puts "Please configure the repos you want to run a report on or run this in a git repo."
 		exit 1
 	end
-	return git_repos
+	return @git_repos
 end
 
 # initializes a grit Repo for each include path
@@ -159,12 +180,12 @@ end
 
 
 
-options = process_options()
-git_repos = find_git_repos() # will exit if it can't find any repos
+@options = process_options()
+@git_repos = find_git_repos() # will exit if it can't find any repos
 							 # has includes and excludes keys, but includes only includes items 
 							 # that weren't excluded by the exclude rules.
-initialize_grit_repos(git_repos) #ads grit Repo objects to the git_repos hash under 'grit' key
-#confirm_saved_changes(git_repos) # will exit if there are any unsaved changes
+initialize_grit_repos(@git_repos) #ads grit Repo objects to the @git_repos hash under 'grit' key
+#confirm_saved_changes(@git_repos) # will exit if there are any unsaved changes
 
 
 response_days = []
@@ -181,8 +202,8 @@ subjects_by_day ={} #guarantees we don't use the same subject from the same day 
 initial_dir = Dir.pwd
 unsaved_changes = false
 
-longest_name = options[:all] ? 0 : nil
-git_repos['grit'].each do |repo|
+longest_name = @options[:all] ? 0 : nil
+@git_repos['grit'].each do |repo|
 	# find_git_repos will automatically filter anything out of the includes list that 
 	# needs to be excluded.
 	
@@ -192,14 +213,14 @@ git_repos['grit'].each do |repo|
 	branches = repo.heads() #an array of Grit::Head objects
 	
 	branches.each do | branch |
-		branch_commits = repo.commits_since(branch.name, options[:since] ) #chronological ordering of commits
+		branch_commits = repo.commits_since(branch.name, @options[:since] ) #chronological ordering of commits
 		branch_commits.each do | commit | 
 			#puts commit.to_hash().inspect()
-			if ( (commit.author.email == options[:email] or options[:all]) and commit.date() >= options[:since] )
+			if ( (commit.author.email == @options[:email] or @options[:all]) and commit.date() >= @options[:since] )
 				# there's currently a bug in grit where commits outside of the specified date range will be returned.
 				# the date check above compensates for that until the patch has been pulled into grit and distributed
 				# widely. - masukomi 7 / 31 / 10
-				if (options[:all])
+				if (@options[:all])
 					longest_name = commit.author.name.length if commit.author.name.length > longest_name
 				end
 				commit_hash = commit.to_hash()
@@ -216,7 +237,7 @@ git_repos['grit'].each do |repo|
 						# if not optoins[:all] this will be keyed by epoch time of commit
 						# otherwise it'll be keyed by committer which will contain a hash with epoch time keys
 					subjects_by_day[date_string] ={}
-					if (options[:all] and not subjects_by_day[date_string][commit.author.email])
+					if (@options[:all] and not subjects_by_day[date_string][commit.author.email])
 						subjects_by_day[date_string][commit.author.email] = {}
 					end
 					response_days.push(date_string)
@@ -234,25 +255,25 @@ end # end iterating over repos
 
 days=['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-puts "Status report for #{options[:all] ? 'All contributors' : options[:email]} (last #{options[:days]} days)"
+puts "Status report for #{@options[:all] ? 'All contributors' : @options[:email]} (last #{@options[:days]} days)"
 
 
 if (response_days.length > 0)
 	response_days.sort!
-	if (options[:reverse])
+	if (@options[:reverse])
 		response_days.reverse!
 	end
 	response_days.each do | date |
 		
-		puts date if not options[:simple]
+		puts date if not @options[:simple]
 		count = nil
-		if (not options[:reverse])
+		if (not @options[:reverse])
 			count = (responses_by_day[date].length > 1) ? 1 : ''
 		else 
 			count = (responses_by_day[date].length > 1) ? responses_by_day[date].length : ''
 		end
 		epoch_commit_times = responses_by_day[date].keys.sort
-		if (options[:reverse])
+		if (@options[:reverse])
 			epoch_commit_times.reverse!
 		end
 		epoch_commit_times.each do |epoch|
@@ -260,15 +281,15 @@ if (response_days.length > 0)
 			commit_info = responses_by_day[date][epoch]
 			commit = commit_info['commit']
 			commit_hash = commit.to_hash()
-			if (not options[:verbose])
-				if (not options[:all])
+			if (not @options[:verbose])
+				if (not @options[:all])
 					puts "\t* #{commit_info['subject']}"
 				else
 					puts "\t* [ %-#{longest_name}s ] %s" % [commit.author.name , commit_info['subject']]
 				end
 			else
 				if (count != '') # a multi-commit day
-					if (not options[:all])
+					if (not @options[:all])
 						puts "\tcommit #{count}---------- "
 					else
 						puts "\tcommit %d -- [ %-#{longest_name}s ] ---------- " % [count, commit.author.name]
@@ -277,9 +298,9 @@ if (response_days.length > 0)
 						puts "\t\t#{message_line}"
 					end
 					puts "\t\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
-					count = options[:reverse] ? count -1 : count +1
+					count = @options[:reverse] ? count -1 : count +1
 				else # just one commit this day
-					if (options[:all])
+					if (@options[:all])
 						puts "\t[ %-#{longest_name}s ] ---------- " % [commit.author.name]
 					end
 					commit_hash['message'].split(/\n/).each do | message_line |
@@ -291,7 +312,7 @@ if (response_days.length > 0)
 		end
 	end
 else
-	puts "No commits found for #{options[:email]}"
+	puts "No commits found for #{@options[:email]}"
 end
 
 

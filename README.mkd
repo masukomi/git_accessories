@@ -31,6 +31,7 @@ Useful for those once a week emails your boss is always asking for.
 		-v, --verbose                    Verbose output includes details on each commit
 		-r, --reverse                    Displays output in reverse chronological order
 		-a, --all                        Displays output for all contributers sorted by person
+		-c, --current                    Generates status report for the current repo only
 		-h, --help                       Displays this message
 
 
