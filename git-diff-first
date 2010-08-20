@@ -1,0 +1,3 @@
+#!/bin/bash
+
+git diff $(git log --follow --pretty=%H $1| tail -n 1) $1
