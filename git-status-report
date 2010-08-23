@@ -84,7 +84,10 @@ def find_git_repos
 	@git_repos = {'includes' => [], 'excludes' => []}
 	if (not @options[:current])
 		raw_excludes = `git config --get status-report.exclude`
-		if (raw_excludes)
+		if (raw_excludes and raw_excludes != '')
+			if (raw_excludes.class == String)
+				raw_excludes = [raw_excludes.sub(/\r\n|\n/, '')]
+			end
 			raw_excludes.each do | path |
 				# don't care if it's not a valid repo because we're not going to attempt
 				# to use anything in excludes
@@ -93,7 +96,10 @@ def find_git_repos
 		end
 		raw_includes = `git config --get-all status-report.include`
 		split_regexp = /\s*,\s*/ #should do a negative lookbehind to make sure it's not an escaped comma
-		if (raw_includes)
+		if (raw_includes and raw_includes != '')
+			if (raw_includes.class == String)
+				raw_includes = [raw_includes.sub(/\r\n|\n/, '')]
+			end
 			raw_includes.each do |path|
 				path.chomp!
 				#make sure it exists
