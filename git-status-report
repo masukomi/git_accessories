@@ -202,7 +202,7 @@ responses_by_day = {}
 	# each epoch date is the key to the details of what was commited at that moment
 	# we need the epoch date so that we can sort the items within the day because
 	# they're pulled in from multiple branches and thus not necessarily in order
-subjects_by_day ={} #guarantees we don't use the same subject from the same day from multiple branches
+author_subjects_by_day ={} #guarantees we don't use the same subject from the same day from multiple branches
 
 
 initial_dir = Dir.pwd
@@ -238,22 +238,36 @@ longest_name = @options[:all] ? 0 : nil
 				}
 				#commit.date() is a Time object 2010-07-26T22:46:41-04:00
 				date_string = sprintf "%02d-%02d-%02d" % [commit.date().year, commit.date().month, commit.date().day]
+
 				if (not responses_by_day[date_string])
 					responses_by_day[date_string] = {}
-						# if not optoins[:all] this will be keyed by epoch time of commit
-						# otherwise it'll be keyed by committer which will contain a hash with epoch time keys
-					subjects_by_day[date_string] ={}
-					if (@options[:all] and not subjects_by_day[date_string][commit.author.email])
-						subjects_by_day[date_string][commit.author.email] = {}
-					end
+					author_subjects_by_day[date_string] = {}
 					response_days.push(date_string)
 				end
-				responses_by_day[date_string][commit.date().to_i] = response_hash
-					# betting on the unlikelyhood of two people commiting at the same second
-					# eventually this will need to be addressed
-					if (not subjects_by_day[date_string][response_hash['subject']])
-						subjects_by_day[date_string][response_hash['subject']] = true
+				if (@options[:all])
+					if (not author_subjects_by_day[date_string][commit.author.email])
+						author_subjects_by_day[date_string][commit.author.email] = {}
 					end
+				end
+				
+				if  ((@options[:all] and not author_subjects_by_day[date_string][commit.author.email][response_hash['subject']]) \
+					or \
+					(not @options[:all] and not author_subjects_by_day[date_string][response_hash['subject']]))
+
+					# using the epoch time of the commit is too unique because it's not 
+					# uncommon to commit on one branch, merge into another branch, and then ammend 
+					# the commit on the merged branch, which gives you the same "work" (as far as the report 
+					# is concerned) but with 2 different commit times
+					
+					# Also, betting on the unlikelyhood of two people commiting at the same second
+					# eventually this will need to be addressed
+					responses_by_day[date_string][commit.date().to_i] = response_hash
+					if (@options[:all] )
+						author_subjects_by_day[date_string][commit.author.email][response_hash['subject']] = true
+					else
+						author_subjects_by_day[date_string][response_hash['subject']] = true
+					end
+				end
 			end
 		end
 	end
@@ -283,8 +297,7 @@ if (response_days.length > 0)
 			epoch_commit_times.reverse!
 		end
 		epoch_commit_times.each do |epoch|
-			
-			commit_info = responses_by_day[date][epoch]
+			commit_info =responses_by_day[date][epoch]
 			commit = commit_info['commit']
 			commit_hash = commit.to_hash()
 			if (not @options[:verbose])
