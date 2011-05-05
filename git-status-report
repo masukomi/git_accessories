@@ -1,4 +1,6 @@
 #!/usr/bin/ruby -W0
+require 'Date'
+require 'Time'
 require 'rubygems'
 require 'optparse'
 require 'grit'
