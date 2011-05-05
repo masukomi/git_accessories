@@ -25,7 +25,9 @@ Useful for those once a week emails your boss is always asking for.
 
 	Usage: git status-report [-e <email>][-d <days>]
 	Generates a status report for what you worked on for the past n days.
-		-e, --email <email address>      The email address of the committer to generate a report for. Defaults to your "git config user.email" address.
+		-e, --email <email address>      The email address of the committer to generate a report for. 
+		                Defaults to your "git config user.email" address. 
+		                Multiple email addresses can be comma separated.
 		-d, --days <num days>            The number of days to generate the report for. Defaults to past 6 days (one week)
 		-s, --simple                     Simpler output. Doesn't include the dates
 		-v, --verbose                    Verbose output includes details on each commit
@@ -47,6 +49,14 @@ directories below it.
 	git config --global --add status-report.include /Users/masukomi/workspace/git_accessories
 	git config --global --add status-report.include /Users/masukomi/workspace/jsonpath-perl
 	git config --global --add status-report.exclude /Users/masukomi/workspace/some_repo_i_want_excluded_from_status-report
+
+If you don't want to use the default e-mail in "git config user.email"
+or you want to specify more than one, but not all, in your default status 
+report you can set those in the status-report section of your git config
+as well.
+
+	git config --global --add status-report.email first-person@example.com
+	git config --global --add status-report.email second-person@example.com
 
 
 Please note that it does not currently support wildcard exclusions.

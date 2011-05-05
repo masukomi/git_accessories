@@ -12,8 +12,8 @@ def process_options()
 	options = {}
 	optparse = OptionParser.new do | opts |
 		opts.banner = "Usage: git status-report [-e <email>][-d <days>]\nGenerates a status report for what you worked on for the past n days."
-		opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. Defaults to your \"git config user.email\" address.") do |email|
-			options[:email] = email
+		opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. \n\t\t\t\t\tDefaults to your \"git config user.email\" address. \n\t\t\t\t\tMultiple email addresses can be comma separated.") do |email|
+			options[:email] = email.split(/,\s*/)
 		end
 		opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
 			options[:days] = days.to_i
@@ -47,8 +47,13 @@ def process_options()
 		exit 1
 	end
 	if (not options[:email])
-		options[:email] = `git config user.email`.chomp
-		if (options[:email] == '')
+		options[:email] = []
+		raw_emails = process_raw_git_configs(`git config --get-all status-report.email`)
+		if (raw_emails and raw_emails.length > 0)
+			raw_emails.each do |email|
+				options[:email].push(email.chomp)
+			end
+		else
 			puts "You haven't configured an e-mail address for git. Please do so or specify one."
 			puts optparse
 			exit 1
@@ -81,26 +86,34 @@ def is_dir_git_repo(path, check_excludes = true)
 	return false
 end
 
+
+# written because Grit doesn't support
+# git config --get-all
+def process_raw_git_configs(raw_output)
+	if (raw_output and raw_output != '')
+		if (raw_output.class == String)
+			return raw_output.split(/\r\n|\n/)
+		else
+			return raw_output
+		end
+	end
+	return []
+end
+
 def find_git_repos
 	pwd = Dir.pwd
 	@git_repos = {'includes' => [], 'excludes' => []}
 	if (not @options[:current])
-		raw_excludes = `git config --get status-report.exclude`
-		if (raw_excludes and raw_excludes != '')
-			if (raw_excludes.class == String)
-				raw_excludes = raw_excludes.split(/\r\n|\n/)
-			end
+		raw_excludes = process_raw_git_configs(`git config --get status-report.exclude`)
+		if (raw_excludes and raw_excludes.length() > 0)
 			raw_excludes.each do | path |
 				# don't care if it's not a valid repo because we're not going to attempt
 				# to use anything in excludes
 				@git_repos['excludes'].push(path.chomp!)
 			end
 		end
-		raw_includes = `git config --get-all status-report.include`
-		if (raw_includes and raw_includes != '')
-			if (raw_includes.class == String)
-				raw_includes = raw_includes.split(/\r\n|\n/)
-			end
+		raw_includes = process_raw_git_configs(`git config --get-all status-report.include`)
+		if (raw_includes and raw_includes.length() > 0)
 			raw_includes.each do |path|
 				path.chomp!
 				#make sure it exists
@@ -209,7 +222,8 @@ author_subjects_by_day ={} #guarantees we don't use the same subject from the sa
 initial_dir = Dir.pwd
 unsaved_changes = false
 
-longest_name = @options[:all] ? 0 : nil
+@multiple_people = (@options[:all] or @options[:email].length() > 1) ? true : false
+longest_name = @multiple_people ? 0 : nil
 @git_repos['grit'].each do |repo|
 	# find_git_repos will automatically filter anything out of the includes list that 
 	# needs to be excluded.
@@ -223,11 +237,11 @@ longest_name = @options[:all] ? 0 : nil
 		branch_commits = repo.commits_since(branch.name, @options[:since] ) #chronological ordering of commits
 		branch_commits.each do | commit | 
 			#puts commit.to_hash().inspect()
-			if ( (commit.author.email == @options[:email] or @options[:all]) and commit.date() >= @options[:since] )
+			if ( (@options[:all] or @options[:email].include?(commit.author.email)) and commit.date() >= @options[:since] )
 				# there's currently a bug in grit where commits outside of the specified date range will be returned.
 				# the date check above compensates for that until the patch has been pulled into grit and distributed
 				# widely. - masukomi 7 / 31 / 10
-				if (@options[:all])
+				if (@multiple_people)
 					longest_name = commit.author.name.length if commit.author.name.length > longest_name
 				end
 				commit_hash = commit.to_hash()
@@ -245,15 +259,15 @@ longest_name = @options[:all] ? 0 : nil
 					author_subjects_by_day[date_string] = {}
 					response_days.push(date_string)
 				end
-				if (@options[:all])
+				if (@multiple_people)
 					if (not author_subjects_by_day[date_string][commit.author.email])
 						author_subjects_by_day[date_string][commit.author.email] = {}
 					end
 				end
 				
-				if  ((@options[:all] and not author_subjects_by_day[date_string][commit.author.email][response_hash['subject']]) \
+				if  ((@multiple_people and not author_subjects_by_day[date_string][commit.author.email][response_hash['subject']]) \
 					or \
-					(not @options[:all] and not author_subjects_by_day[date_string][response_hash['subject']]))
+					(not @multiple_people and not author_subjects_by_day[date_string][response_hash['subject']]))
 
 					# using the epoch time of the commit is too unique because it's not 
 					# uncommon to commit on one branch, merge into another branch, and then ammend 
@@ -263,7 +277,7 @@ longest_name = @options[:all] ? 0 : nil
 					# Also, betting on the unlikelyhood of two people commiting at the same second
 					# eventually this will need to be addressed
 					responses_by_day[date_string][commit.date().to_i] = response_hash
-					if (@options[:all] )
+					if ( @multiple_people )
 						author_subjects_by_day[date_string][commit.author.email][response_hash['subject']] = true
 					else
 						author_subjects_by_day[date_string][response_hash['subject']] = true
@@ -276,7 +290,7 @@ end # end iterating over repos
 
 days=['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-puts "Status report for #{@options[:all] ? 'All contributors' : @options[:email]} (last #{@options[:days]} days)"
+puts "Status report for #{@options[:all] ? 'All contributors' : @options[:email].join(', ')} (last #{@options[:days]} days)"
 
 
 if (response_days.length > 0)
@@ -302,14 +316,14 @@ if (response_days.length > 0)
 			commit = commit_info['commit']
 			commit_hash = commit.to_hash()
 			if (not @options[:verbose])
-				if (not @options[:all])
+				if (not (@options[:all] or @multiple_people))
 					puts "\t* #{commit_info['subject']}"
 				else
 					puts "\t* [ %-#{longest_name}s ] %s" % [commit.author.name , commit_info['subject']]
 				end
 			else
 				if (count != '') # a multi-commit day
-					if (not @options[:all])
+					if (not (@options[:all] or @multiple_people))
 						puts "\tcommit #{count}---------- "
 					else
 						puts "\tcommit %d -- [ %-#{longest_name}s ] ---------- " % [count, commit.author.name]
@@ -320,7 +334,7 @@ if (response_days.length > 0)
 					puts "\t\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
 					count = @options[:reverse] ? count -1 : count +1
 				else # just one commit this day
-					if (@options[:all])
+					if (@options[:all] or @multiple_people)
 						puts "\t[ %-#{longest_name}s ] ---------- " % [commit.author.name]
 					end
 					commit_hash['message'].split(/\n/).each do | message_line |
@@ -332,7 +346,7 @@ if (response_days.length > 0)
 		end
 	end
 else
-	puts "No commits found for #{@options[:email]}"
+	puts "No commits found for #{@options[:email].join(', ')}"
 end
 
 
