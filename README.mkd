@@ -50,6 +50,8 @@ directories below it.
 	git config --global --add status-report.include /Users/masukomi/workspace/jsonpath-perl
 	git config --global --add status-report.exclude /Users/masukomi/workspace/some_repo_i_want_excluded_from_status-report
 
+Please note that it does not currently support wildcard exclusions.
+
 If you don't want to use the default e-mail in "git config user.email"
 or you want to specify more than one, but not all, in your default status 
 report you can set those in the status-report section of your git config
@@ -59,7 +61,6 @@ as well.
 	git config --global --add status-report.email second-person@example.com
 
 
-Please note that it does not currently support wildcard exclusions.
 
 Configuration Options
 ---------------------
