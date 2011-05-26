@@ -33,6 +33,9 @@ def process_options()
 		opts.on('-c', '--current', "Generates status report for the current repo only") do
 			options[:current] = true
 		end
+		opts.on('-f', '--files', "Display a list of files involved in the commit(s)") do
+			options[:files] = true
+		end
 		opts.on("-h", "--help", "Displays this message") do 
 			puts optparse
 			exit 0
@@ -195,6 +198,17 @@ def initialize_grit_repos (git_repos)
 	end
 end
 
+# gets a list of files affected by a commit
+def get_files_in_commit(commit)
+	files = {}
+	commit.diffs.each do | diff | 
+		files[diff.a_path] = nil unless files.has_key? diff.a_path
+		files[diff.b_path] = nil unless files.has_key? diff.b_path
+		# what about diff.deleted_file and diff.new_file?
+	end
+	return files.keys
+end
+
 
 #END Subroutines
 
@@ -341,6 +355,12 @@ if (response_days.length > 0)
 						puts "\t#{message_line}"
 					end
 					puts "\t[Found in branch \"#{commit_info['branch'].name}\" of repo at #{commit_info['repo'].path}]" 
+				end
+			end
+			if @options[:files]
+				puts "\t\tFiles:"
+				get_files_in_commit(commit).sort().each do | file |
+					puts "\t\t\t* #{file}"
 				end
 			end
 		end

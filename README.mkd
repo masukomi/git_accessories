@@ -34,6 +34,7 @@ Useful for those once a week emails your boss is always asking for.
 		-r, --reverse                    Displays output in reverse chronological order
 		-a, --all                        Displays output for all contributers sorted by person
 		-c, --current                    Generates status report for the current repo only
+		-f, --files                      Display a list of files involved in the commit(s)
 		-h, --help                       Displays this message
 
 
