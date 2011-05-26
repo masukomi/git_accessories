@@ -36,6 +36,9 @@ def process_options()
 		opts.on('-f', '--files', "Display a list of files involved in the commit(s)") do
 			options[:files] = true
 		end
+		opts.on('-b', '--branches <branch name>', "Limit results to work found in the specified branch(es). \n\t\t\t\t\tMultiple branches can be comma separated") do | branches |
+			options[:branches] = branches.split(/,\s*/)
+		end
 		opts.on("-h", "--help", "Displays this message") do 
 			puts optparse
 			exit 0
@@ -248,6 +251,9 @@ longest_name = @multiple_people ? 0 : nil
 	branches = repo.heads() #an array of Grit::Head objects
 	
 	branches.each do | branch |
+		if (@options[:branches] and not @options[:branches].include? branch.name)
+			next
+		end
 		branch_commits = repo.commits_since(branch.name, @options[:since] ) #chronological ordering of commits
 		branch_commits.each do | commit | 
 			#puts commit.to_hash().inspect()
@@ -366,7 +372,7 @@ if (response_days.length > 0)
 		end
 	end
 else
-	puts "No commits found for #{@options[:email].join(', ')}"
+	puts "No commits found for #{@options[:email].join(', ')} #{@options[:branches] ? "on branch(es) #{@options[:branches].join(', ')}" : ''}"
 end
 
 

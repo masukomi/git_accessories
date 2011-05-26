@@ -35,6 +35,9 @@ Useful for those once a week emails your boss is always asking for.
 		-a, --all                        Displays output for all contributers sorted by person
 		-c, --current                    Generates status report for the current repo only
 		-f, --files                      Display a list of files involved in the commit(s)
+		-b, --branches <branch name>     Limit results to work found in the specified branch(es). 
+		                                    Multiple branches can be comma separated
+		
 		-h, --help                       Displays this message
 
 
