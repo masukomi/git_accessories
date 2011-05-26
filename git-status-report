@@ -12,36 +12,36 @@ def process_options()
 	options = {}
 	optparse = OptionParser.new do | opts |
 		opts.banner = "Usage: git status-report [-e <email>][-d <days>]\nGenerates a status report for what you worked on for the past n days."
-		opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. \n\t\t\t\t\tDefaults to your \"git config user.email\" address. \n\t\t\t\t\tMultiple email addresses can be comma separated.") do |email|
-			options[:email] = email.split(/,\s*/)
+		opts.on("-a", "--all", "Displays output for all contributers sorted by person") do 
+			options[:all] = true
+		end
+		opts.on('-b', '--branches <branch name>', "Limit results to work found in the specified branch(es). \n\t\t\t\t\tMultiple branches can be comma separated") do | branches |
+			options[:branches] = branches.split(/,\s*/)
+		end
+		opts.on('-c', '--current', "Generates status report for the current repo only") do
+			options[:current] = true
 		end
 		opts.on("-d", "--days <num days>", "The number of days to generate the report for. Defaults to past 6 days (one week)") do | days |
 			options[:days] = days.to_i
+		end
+		opts.on("-e", "--email <email address>", "The email address of the committer to generate a report for. \n\t\t\t\t\tDefaults to your \"git config user.email\" address. \n\t\t\t\t\tMultiple email addresses can be comma separated.") do |email|
+			options[:email] = email.split(/,\s*/)
+		end
+		opts.on('-f', '--files', "Display a list of files involved in the commit(s)") do
+			options[:files] = true
+		end
+		opts.on("-h", "--help", "Displays this message") do 
+			puts optparse
+			exit 0
+		end
+		opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
+			options[:reverse] = true
 		end
 		opts.on("-s", "--simple", "Simpler output. Doesn't include the dates") do
 			options[:simple] = true
 		end
 		opts.on("-v", "--verbose", "Verbose output includes details on each commit") do
 			options[:verbose] = true
-		end
-		opts.on("-r", "--reverse", "Displays output in reverse chronological order") do 
-			options[:reverse] = true
-		end
-		opts.on("-a", "--all", "Displays output for all contributers sorted by person") do 
-			options[:all] = true
-		end
-		opts.on('-c', '--current', "Generates status report for the current repo only") do
-			options[:current] = true
-		end
-		opts.on('-f', '--files', "Display a list of files involved in the commit(s)") do
-			options[:files] = true
-		end
-		opts.on('-b', '--branches <branch name>', "Limit results to work found in the specified branch(es). \n\t\t\t\t\tMultiple branches can be comma separated") do | branches |
-			options[:branches] = branches.split(/,\s*/)
-		end
-		opts.on("-h", "--help", "Displays this message") do 
-			puts optparse
-			exit 0
 		end
 	end
 
