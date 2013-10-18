@@ -1,12 +1,19 @@
 #!/bin/sh
 # prints out the name of the last person to touch a file,
-# the date they touched it, and the path to the file
+# the date they touched it, and the path to the file.
+# The display of the file is optional and based on passing 
+# --file as the first argument to the script
 
 
 if [ $# -lt 1 ]; then
-	echo 1>&2 Usage: git-last \<filepath\> \[ -v \]
+	echo 1>&2 Usage: git-last [--file] \<filepath\> \[ -v \]
+	echo "The optional --file option will output the filename"
 	exit 1
 else
-	echo $(git log -n 1 --date=short --format="%an %ad" -- $1) $1
+	if [ "$1" == "--file" ]; then
+		echo $(git log -n 1 --date=short --format="%an %ad" -- $2) $2
+	else
+		echo $(git log -n 1 --date=short --format="%an %ad" -- $1)
+	fi
 fi
 
