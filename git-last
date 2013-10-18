@@ -1,0 +1,12 @@
+#!/bin/sh
+# prints out the name of the last person to touch a file,
+# the date they touched it, and the path to the file
+
+
+if [ $# -lt 1 ]; then
+	echo 1>&2 Usage: git-last \<filepath\> \[ -v \]
+	exit 1
+else
+	echo $(git log -n 1 --date=short --format="%an %ad" -- $1) $1
+fi
+
